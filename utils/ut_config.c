@@ -382,6 +382,7 @@ int load_cfg_redis_sentinel(json_t *root, const char *key, redis_sentinel_cfg *c
 
     ERR_RET(read_cfg_str(node, "name", &cfg->name, NULL));
     ERR_RET(read_cfg_int(node, "db", &cfg->db, false, 0));
+    ERR_RET(read_cfg_int(node, "type", &cfg->type, false, 1));
 
     json_t *addr = json_object_get(node, "addr");
     if (!addr || !json_is_array(addr))

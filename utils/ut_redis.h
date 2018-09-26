@@ -20,6 +20,7 @@ typedef struct redis_sentinel_cfg {
     uint32_t addr_count;
     redis_addr *addr_arr;
     int db;
+    int type;
 } redis_sentinel_cfg;
 
 typedef struct redis_sentinel_node {
@@ -32,6 +33,7 @@ typedef struct redis_sentinel_t {
     char *name;
     redis_sentinel_node *list;
     int db;
+    int type; /*0 for single, 1 for sentinel*/
 } redis_sentinel_t;
 
 redis_sentinel_t *redis_sentinel_create(redis_sentinel_cfg *cfg);

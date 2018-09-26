@@ -46,6 +46,7 @@ redis_sentinel_t *redis_sentinel_create(redis_sentinel_cfg *cfg)
         return NULL;
     memset(context, 0, sizeof(redis_sentinel_t));
     context->db = cfg->db;
+    context->type = cfg->type;
     context->name = strdup(cfg->name);
     if (context->name == NULL) {
         free(context);
@@ -184,52 +185,69 @@ int redis_sentinel_get_slave_addr(redis_sentinel_t *context, redis_addr *addr)
 
 redisContext *redis_sentinel_connect_master(redis_sentinel_t *context)
 {
-    for (int i = 0; i < 3; ++i) {
-        redis_addr addr;
-        if (redis_sentinel_get_master_addr(context, &addr) < 0)
-            return NULL;
+	if(context->type) {
+		for (int i = 0; i < 3; ++i) {
+			redis_addr addr;
+			if (redis_sentinel_get_master_addr(context, &addr) < 0)
+				return NULL;
 
-        struct timeval timeout = { 3, 0 };
-        redisContext *redis = redisConnectWithTimeout(addr.host, addr.port, timeout);
-        if (redis == NULL || redis->err) {
-            if (redis) {
-                redisFree(redis);
-            }
-            free(addr.host);
-            return NULL;
-        }
-        free(addr.host);
-        redisSetTimeout(redis, timeout);
+			struct timeval timeout = { 3, 0 };
+			redisContext *redis = redisConnectWithTimeout(addr.host, addr.port, timeout);
+			if (redis == NULL || redis->err) {
+				if (redis) {
+					redisFree(redis);
+				}
+				free(addr.host);
+				return NULL;
+			}
+			free(addr.host);
+			redisSetTimeout(redis, timeout);
 
-        redisReply *reply = redisCommand(redis, "ROLE");
-        if (reply == NULL || reply->type != REDIS_REPLY_ARRAY) {
-            if (reply) {
-                freeReplyObject(reply);
-            }
-            redisFree(redis);
-            return NULL;
-        }
-        if (strcmp(reply->element[0]->str, "master") != 0) {
-            freeReplyObject(reply);
-            redisFree(redis);
-            continue;
-        }
-        freeReplyObject(reply);
+			redisReply *reply = redisCommand(redis, "ROLE");
+			if (reply == NULL || reply->type != REDIS_REPLY_ARRAY) {
+				if (reply) {
+					freeReplyObject(reply);
+				}
+				redisFree(redis);
+				return NULL;
+			}
+			if (strcmp(reply->element[0]->str, "master") != 0) {
+				freeReplyObject(reply);
+				redisFree(redis);
+				continue;
+			}
+			freeReplyObject(reply);
 
-        if (context->db > 0) {
-            reply = redisCommand(redis, "SELECT %d", context->db);
-            if (redis == NULL || reply->type == REDIS_REPLY_ERROR) {
-                if (reply) {
-                    freeReplyObject(reply);
-                }
-                redisFree(redis);
-                return NULL;
-            }
-            freeReplyObject(reply);
-        }
+			if (context->db > 0) {
+				reply = redisCommand(redis, "SELECT %d", context->db);
+				if (redis == NULL || reply->type == REDIS_REPLY_ERROR) {
+					if (reply) {
+						freeReplyObject(reply);
+					}
+					redisFree(redis);
+					return NULL;
+				}
+				freeReplyObject(reply);
+			}
 
-        return redis;
-    }
+			return redis;
+		}
+	}else {
+		redis_sentinel_node * nodelist = context->list;
+		struct timeval timeout = { 3, 0 };
+		while(nodelist) {
+			redisContext *redis = redisConnectWithTimeout(nodelist->addr.host, nodelist->addr.port, timeout);
+			if (redis == NULL || redis->err) {
+				if (redis) {
+					redisFree(redis);
+				}
+				nodelist = nodelist->next;
+				continue;
+			}
+			log_info("[garfield]connect to redis host=%s port=%d\n", nodelist->addr.host, nodelist->addr.port);
+			return redis;
+		}
+	}
 
     return NULL;
 }
