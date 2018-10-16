@@ -23,7 +23,7 @@
         "bind": "tcp@0.0.0.0:8081",
         "max_pkg_size": 1024
     },
-    "worker_num": 4,
+    "worker_num": 2,
     "timeout": 1.0,
     "matchengine": {
         "name": "matchengine",
